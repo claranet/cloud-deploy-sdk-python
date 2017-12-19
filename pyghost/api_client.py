@@ -493,6 +493,13 @@ class JobsApiClient(ApiClient):
         }
         return self.create(job)
 
+    def get_logs(self, job_id, last_pos):
+        if job_id is None:
+            raise ApiClientException('You must specify the job_id')
+        path = '/jobs/logs/' + job_id + '/' + str(last_pos)
+        data = self._do_request(path, params={})
+        return data
+
 
 class DeploymentsApiClient(ApiClient):
     path = '/deployments/'
