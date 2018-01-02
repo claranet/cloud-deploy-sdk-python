@@ -146,6 +146,23 @@ class ApiClient(object):
             raise ApiClientException('Error while reading response from {}'.format(url)) from e
         return ret
 
+    def _do_raw_request(self, path, object_id=None, body=None, params=None, method=METHOD_GET):
+        url = self._get_url(path, params, object_id)
+        try:
+            response = requests.request(method, url,
+                                        json=body,
+                                        auth=(self.username, self.password),
+                                        headers=DEFAULT_HEADERS)
+            if response.status_code >= 300:
+                raise ApiClientException(
+                    'Error while calling Cloud Deploy : [{}] {}'.format(response.status_code, response.text))
+            ret = response
+        except requests.ConnectionError as e:
+            raise ApiClientException('Error while sending request to {}'.format(url)) from e
+        except ValueError as e:
+            raise ApiClientException('Error while reading response from {}'.format(url)) from e
+        return ret
+
     def _do_retrieve(self, path, object_id, **extra_params):
         """
         Do the retrieve API call
@@ -493,11 +510,9 @@ class JobsApiClient(ApiClient):
         }
         return self.create(job)
 
-    def get_logs(self, job_id, last_pos):
-        if job_id is None:
-            raise ApiClientException('You must specify the job_id')
-        path = '/jobs/logs/' + job_id + '/' + str(last_pos)
-        data = self._do_request(path, params={})
+    def get_logs(self, job_id):
+        path = '/jobs/' + job_id + '/logs/'
+        data = self._do_raw_request(path, params={})
         return data
 
 
