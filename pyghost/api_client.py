@@ -120,7 +120,7 @@ class ApiClient(object):
             return "{}?{}".format(base_url, urllib.parse.urlencode(params, safe=':'))
         return base_url
 
-    def _do_request(self, path, object_id=None, body=None, params=None, method=METHOD_GET):
+    def _do_request(self, path, object_id=None, body=None, params=None, method=METHOD_GET, is_raw=False):
         """
         Do the API requests
         :param path: str:
@@ -128,6 +128,7 @@ class ApiClient(object):
         :param body: dict:
         :param params: dict:
         :param method: str:
+        :param is_raw: bool:
         :return: dict:
         """
         url = self._get_url(path, params, object_id)
@@ -139,24 +140,10 @@ class ApiClient(object):
             if response.status_code >= 300:
                 raise ApiClientException(
                     'Error while calling Cloud Deploy : [{}] {}'.format(response.status_code, response.text))
-            ret = response.json()
-        except requests.ConnectionError as e:
-            raise ApiClientException('Error while sending request to {}'.format(url)) from e
-        except ValueError as e:
-            raise ApiClientException('Error while reading response from {}'.format(url)) from e
-        return ret
-
-    def _do_raw_request(self, path, object_id=None, body=None, params=None, method=METHOD_GET):
-        url = self._get_url(path, params, object_id)
-        try:
-            response = requests.request(method, url,
-                                        json=body,
-                                        auth=(self.username, self.password),
-                                        headers=DEFAULT_HEADERS)
-            if response.status_code >= 300:
-                raise ApiClientException(
-                    'Error while calling Cloud Deploy : [{}] {}'.format(response.status_code, response.text))
-            ret = response
+            if is_raw:
+                ret = response
+            else:
+                ret = response.json()
         except requests.ConnectionError as e:
             raise ApiClientException('Error while sending request to {}'.format(url)) from e
         except ValueError as e:
@@ -512,7 +499,7 @@ class JobsApiClient(ApiClient):
 
     def get_logs(self, job_id):
         path = '/jobs/' + job_id + '/logs/'
-        data = self._do_raw_request(path, params={})
+        data = self._do_request(path, params={}, is_raw=True)
         return data
 
 
