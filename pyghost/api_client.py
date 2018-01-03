@@ -14,6 +14,9 @@ DEFAULT_PAGE_SIZE = 20
 METHOD_GET = 'get'
 METHOD_POST = 'post'
 
+RETURN_TYPE_PLAIN = 'plain'
+RETURN_TYPE_JSON = 'json'
+
 DEPLOYMENT_STRATEGY_SERIAL = 'serial'
 DEPLOYMENT_STRATEGY_PARALLEL = 'parallel'
 DEPLOYMENT_STRATEGIES = (DEPLOYMENT_STRATEGY_SERIAL, DEPLOYMENT_STRATEGY_PARALLEL)
@@ -120,7 +123,7 @@ class ApiClient(object):
             return "{}?{}".format(base_url, urllib.parse.urlencode(params, safe=':'))
         return base_url
 
-    def _do_request(self, path, object_id=None, body=None, params=None, method=METHOD_GET, is_raw=False):
+    def _do_request(self, path, object_id=None, body=None, params=None, method=METHOD_GET, return_type=RETURN_TYPE_JSON):
         """
         Do the API requests
         :param path: str:
@@ -128,7 +131,7 @@ class ApiClient(object):
         :param body: dict:
         :param params: dict:
         :param method: str:
-        :param is_raw: bool:
+        :param return_type: str:
         :return: dict:
         """
         url = self._get_url(path, params, object_id)
@@ -140,10 +143,10 @@ class ApiClient(object):
             if response.status_code >= 300:
                 raise ApiClientException(
                     'Error while calling Cloud Deploy : [{}] {}'.format(response.status_code, response.text))
-            if is_raw:
-                ret = response
-            else:
+            if return_type == RETURN_TYPE_JSON:
                 ret = response.json()
+            else:
+                ret = response.text
         except requests.ConnectionError as e:
             raise ApiClientException('Error while sending request to {}'.format(url)) from e
         except ValueError as e:
@@ -499,7 +502,7 @@ class JobsApiClient(ApiClient):
 
     def get_logs(self, job_id):
         path = '/jobs/' + job_id + '/logs/'
-        data = self._do_request(path, params={}, is_raw=True)
+        data = self._do_request(path, params={}, return_type=RETURN_TYPE_PLAIN)
         return data
 
 
