@@ -1,11 +1,11 @@
-import urllib.parse
-
 import copy
 import json
+import requests
+
+import urllib.parse
 from base64 import b64encode
 from enum import Enum
 
-import requests
 
 DEFAULT_HEADERS = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
@@ -123,7 +123,8 @@ class ApiClient(object):
             return "{}?{}".format(base_url, urllib.parse.urlencode(params, safe=':'))
         return base_url
 
-    def _do_request(self, path, object_id=None, body=None, params=None, method=METHOD_GET, return_type=RETURN_TYPE_JSON):
+    def _do_request(self, path, object_id=None, body=None, params=None,
+                    method=METHOD_GET, return_type=RETURN_TYPE_JSON):
         """
         Do the API requests
         :param path: str:
