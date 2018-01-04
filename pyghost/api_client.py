@@ -502,7 +502,7 @@ class JobsApiClient(ApiClient):
         return self.create(job)
 
     def get_logs(self, job_id):
-        path = '/jobs/' + job_id + '/logs/'
+        path = '/jobs/{}/logs/'.format(job_id)
         data = self._do_request(path, params={}, return_type=RETURN_TYPE_PLAIN)
         return data
 
