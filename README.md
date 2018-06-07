@@ -13,6 +13,7 @@ Requirements
 
 Installation
 ------------
+
 With [pip](https://pip.pypa.io) (in a [virtualenv](https://virtualenv.pypa.io) or not)
 
 ```
