@@ -427,5 +427,22 @@ class JobsApiClient(ApiClient):
 class DeploymentsApiClient(ApiClient):
     path = '/deployments/'
 
-    def list(self, nb=DEFAULT_PAGE_SIZE, page=1, sort='-timestamp'):
-        return self._do_list(self.path, nb, page, sort, embedded='{"app_id":1,"job_id":1}')
+    def list(self, nb=DEFAULT_PAGE_SIZE, page=1, sort='-timestamp', application=None, env=None, role=None, revision=None, module=None):
+        query = {}
+
+        if application or env or role:
+            apps_api = AppsApiClient(self.host, self.username, self.password)
+            applications = ['{"app_id":"' + application['_id'] + '"}' for application in apps_api.list(page=page, name=application, role=role, env=env)[0]]
+            if len(applications) > 0:
+                query['$or'] = '[' + ','.join(applications) + ']'
+            else:
+                query['$or'] = '[{"app_id": "null"}]'
+
+        if revision:
+            query['revision'] = '"' + revision + '"'
+
+        if module:
+            query['module'] = '{"$regex":".*' + module + '.*"}'
+
+        querystr = '{' + ','.join('"{key}":{value}'.format(key=key, value=value) for key, value in query.items()) + '}'
+        return self._do_list(self.path, nb, page, sort, embedded='{"app_id":1,"job_id":1}', where=querystr)
