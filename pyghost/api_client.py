@@ -53,6 +53,25 @@ class JobStatuses(Enum):
     ABORTED = 'aborted'
 
 
+class JobCommands(Enum):
+    def __str__(self):
+        return str(self.value)
+    BUILDIMAGE = 'buildimage'
+    CREATEINSTANCE = 'createinstance'
+    DEPLOY = 'deploy'
+    DESTROYALLINSTANCES = 'destroyallinstances'
+    EXECUTESCRIPT = 'executescript'
+    PREPAREBLUEGREEN = 'preparebluegreen'
+    PURGEBLUEGREEN = 'purgebluegreen'
+    RECREATEINSTANCES = 'recreateinstances'
+    REDEPLOY = 'redeploy'
+    SWAPBLUEGREEN = 'swapbluegreen'
+    UPDATEAUTOSCALING = 'updateautoscaling'
+    UPDATELIFECYCLEHOOKS = 'updatelifecyclehooks'
+    DESTROYINSTANCE = 'destroyinstance'
+    ROLLBACK = 'rollback'
+
+
 class ApiClientException(Exception):
     pass
 
