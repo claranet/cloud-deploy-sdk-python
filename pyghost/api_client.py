@@ -1,7 +1,7 @@
 import base64
-import re
 import copy
 import json
+import re
 import time
 import urllib.parse
 from base64 import b64encode
@@ -10,13 +10,13 @@ from enum import Enum
 import requests
 from socketIO_client import SocketIO
 
-
 DEFAULT_HEADERS = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
 DEFAULT_PAGE_SIZE = 20
 
 METHOD_GET = 'get'
 METHOD_POST = 'post'
+METHOD_PATCH = 'patch'
 
 RETURN_TYPE_PLAIN = 'plain'
 RETURN_TYPE_JSON = 'json'
@@ -128,7 +128,7 @@ class ApiClient(object):
         return base_url
 
     def _do_request(self, path, object_id=None, body=None, params=None,
-                    method=METHOD_GET, return_type=RETURN_TYPE_JSON):
+                    method=METHOD_GET, return_type=RETURN_TYPE_JSON, headers={}):
         """
         Do the API requests
         :param path: str:
@@ -144,7 +144,7 @@ class ApiClient(object):
             response = requests.request(method, url,
                                         json=body,
                                         auth=(self.username, self.password),
-                                        headers=DEFAULT_HEADERS)
+                                        headers={**DEFAULT_HEADERS,**headers})
             if response.status_code >= 300:
                 raise ApiClientException(
                     'Error while calling Cloud Deploy : [{}] {}'.format(response.status_code, response.text))
@@ -194,6 +194,17 @@ class ApiClient(object):
         :return: str:
         """
         data = self._do_request(path, body=obj, params=extra_params, method=METHOD_POST)
+        return data.get('_id')
+
+    def _do_update(self, path, obj, headers, **extra_params):
+        """
+        Do the update API call
+        :param path: str:
+        :param obj: dict:
+        :param extra_params: dict:
+        :return: str:
+        """
+        data = self._do_request(path, body=obj, params=extra_params, method=METHOD_PATCH, headers=headers)
         return data.get('_id')
 
     def retrieve(self, object_id):
@@ -265,6 +276,26 @@ class AppsApiClient(ApiClient):
         if name is not None:
             query.append('"name":{{"$regex":"{name}"}}'.format(name=name))
         return self._do_list(self.path, nb, page, sort, where='{' + ",".join(query) + '}')
+
+    def create(self, obj):
+        """
+        Create an object
+        :param obj: dict: the object
+        :return: str: id of the created object
+        """
+        if not self.path:
+            raise NotImplementedError('`path` variable must be defined')
+        return self._do_create(self.path, obj)
+
+    def update(self, obj, etag):
+        """
+        Update an object
+        :param obj: dict: the object
+        :return: str: id of the updated object
+        """
+        if not self.path:
+            raise NotImplementedError('`path` variable must be defined')
+        return self._do_update(self.path + obj['_id'], obj, {'If-Match': etag})
 
 
 def get_applist_join_query(apps_api, application_name, role, env):
