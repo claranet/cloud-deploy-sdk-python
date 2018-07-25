@@ -45,6 +45,7 @@ ROLLING_UPDATE_STRATEGIES = (ROLLING_UPDATE_STRATEGY_ONE_BY_ONE, ROLLING_UPDATE_
 class JobStatuses(Enum):
     def __str__(self):
         return str(self.value)
+
     INIT = 'init'
     STARTED = 'started'
     CANCELLED = 'cancelled'
@@ -56,6 +57,7 @@ class JobStatuses(Enum):
 class JobCommands(Enum):
     def __str__(self):
         return str(self.value)
+
     BUILDIMAGE = 'buildimage'
     CREATEINSTANCE = 'createinstance'
     DEPLOY = 'deploy'
@@ -241,12 +243,16 @@ class AppsApiClient(ApiClient):
 class JobsApiClient(ApiClient):
     path = '/jobs/'
 
-    def list(self, nb=DEFAULT_PAGE_SIZE, page=1, sort='-_updated', application=None, env=None, role=None, command=None, status=None, user=None):
+    def list(self, nb=DEFAULT_PAGE_SIZE, page=1, sort='-_updated',
+             application=None, env=None, role=None, command=None, status=None, user=None):
         query = {}
 
         if application or env or role:
             apps_api = AppsApiClient(self.host, self.username, self.password)
-            applications = ['{"app_id":"' + application['_id'] + '"}' for application in apps_api.list(page=page, name=application, role=role, env=env)[0]]
+            applications = [
+                '{"app_id":"' + application['_id'] + '"}'
+                for application in apps_api.list(page=page, name=application, role=role, env=env)[0]
+            ]
             if len(applications) > 0:
                 query['$or'] = '[' + ','.join(applications) + ']'
             else:
@@ -478,12 +484,16 @@ class JobsApiClient(ApiClient):
 class DeploymentsApiClient(ApiClient):
     path = '/deployments/'
 
-    def list(self, nb=DEFAULT_PAGE_SIZE, page=1, sort='-timestamp', application=None, env=None, role=None, revision=None, module=None):
+    def list(self, nb=DEFAULT_PAGE_SIZE, page=1, sort='-timestamp',
+             application=None, env=None, role=None, revision=None, module=None):
         query = {}
 
         if application or env or role:
             apps_api = AppsApiClient(self.host, self.username, self.password)
-            applications = ['{"app_id":"' + application['_id'] + '"}' for application in apps_api.list(page=page, name=application, role=role, env=env)[0]]
+            applications = [
+                '{"app_id":"' + application['_id'] + '"}'
+                for application in apps_api.list(page=page, name=application, role=role, env=env)[0]
+            ]
             if len(applications) > 0:
                 query['$or'] = '[' + ','.join(applications) + ']'
             else:
