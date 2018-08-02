@@ -224,6 +224,19 @@ class ApiClient(object):
             raise NotImplementedError('`path` variable must be defined')
         return self._do_create(self.path, obj)
 
+    def version(self):
+        """
+        Return Cloud-Deploy running version
+        """
+        try:
+            return self._do_request('/version')
+        except:
+            return {
+                'current_revision_date': '',
+                'current_revision_name': 'unknown',
+                'current_revision': 'unknown'
+            }
+
 
 class AppsApiClient(ApiClient):
     path = '/apps/'
@@ -501,7 +514,6 @@ class JobsApiClient(ApiClient):
         }
         return self.create(job)
 
-
     def get_logs(self, job_id):
         """
         Return a job log
@@ -511,6 +523,14 @@ class JobsApiClient(ApiClient):
         path = '/jobs/{}/logs/'.format(job_id)
         data = self._do_request(path, params={}, return_type=RETURN_TYPE_PLAIN)
         return data
+
+    def check_websocket(self):
+        """
+        Return websocket status
+        :return: bool: status of the websocket service
+        """
+        check_ws = requests.get('{}/socket.io/'.format(self.host))
+        return check_ws.status_code == 200
 
 
 class DeploymentsApiClient(ApiClient):
