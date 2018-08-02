@@ -577,6 +577,20 @@ class JobsApiClient(ApiClient):
             return job
 
 
+    def get_websocket_token(self, job_id):
+        """
+        Return a job websocket token
+        :param job_id: str: Job ID
+        :return: str: websocket token of the job
+        """
+        path = '/jobs/{}/websocket_token/'.format(job_id)
+        try:
+            token = self._do_request(path, params={}).get('token', '')
+        except:
+            token = False
+        return token
+
+
 class DeploymentsApiClient(ApiClient):
     path = '/deployments/'
 
