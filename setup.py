@@ -18,7 +18,7 @@ setup(
     description=about['__description__'],
     version=about['__version__'],
     author=about['__author__'],
-#    author_email=about['__author_email__'],
+    author_email=about['__author_email__'],
     url=about['__url__'],
     license=about['__license__'],
     python_requires='>=3.4',
