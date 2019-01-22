@@ -1,7 +1,9 @@
 import urllib.parse
 
 import copy
+import json
 from base64 import b64encode
+from enum import Enum
 
 import requests
 
@@ -39,6 +41,38 @@ ROLLING_UPDATE_STRATEGY_QUARTER = '25%'
 ROLLING_UPDATE_STRATEGY_HALF = '50%'
 ROLLING_UPDATE_STRATEGIES = (ROLLING_UPDATE_STRATEGY_ONE_BY_ONE, ROLLING_UPDATE_STRATEGY_THIRD,
                              ROLLING_UPDATE_STRATEGY_QUARTER, ROLLING_UPDATE_STRATEGY_HALF)
+
+
+class JobStatuses(Enum):
+    def __str__(self):
+        return str(self.value)
+
+    INIT = 'init'
+    STARTED = 'started'
+    CANCELLED = 'cancelled'
+    DONE = 'done'
+    FAILED = 'failed'
+    ABORTED = 'aborted'
+
+
+class JobCommands(Enum):
+    def __str__(self):
+        return str(self.value)
+
+    BUILDIMAGE = 'buildimage'
+    CREATEINSTANCE = 'createinstance'
+    DEPLOY = 'deploy'
+    DESTROYALLINSTANCES = 'destroyallinstances'
+    EXECUTESCRIPT = 'executescript'
+    PREPAREBLUEGREEN = 'preparebluegreen'
+    PURGEBLUEGREEN = 'purgebluegreen'
+    RECREATEINSTANCES = 'recreateinstances'
+    REDEPLOY = 'redeploy'
+    SWAPBLUEGREEN = 'swapbluegreen'
+    UPDATEAUTOSCALING = 'updateautoscaling'
+    UPDATELIFECYCLEHOOKS = 'updatelifecyclehooks'
+    DESTROYINSTANCE = 'destroyinstance'
+    ROLLBACK = 'rollback'
 
 
 class ApiClientException(Exception):
@@ -131,7 +165,7 @@ class ApiClient(object):
         :param page: int:
         :param sort: str:
         :param extra_params: dict:
-        :return: tuple:
+        :return: tuple: (data_list, data_results_per_page, data_total_items, data_current_page)
         """
         params = copy.deepcopy(extra_params)
         params.update({'max_results': nb, 'page': page, 'sort': sort})
@@ -207,11 +241,47 @@ class AppsApiClient(ApiClient):
         return self._do_list(self.path, nb, page, sort, where='{' + ",".join(query) + '}')
 
 
+def get_applist_join_query(apps_api, application_name, role, env):
+    """
+    Helper function to generate a query value, get all related application
+    :param apps_api: AppsApiClient instance
+    :param application_name: query app name filter
+    :param role: query role filter
+    :param env: query env filter
+    """
+    app_list, _, _, _ = apps_api.list(name=application_name, role=role, env=env)
+    applications = [
+        json.dumps({"app_id": application['_id']})
+        for application in app_list
+    ]
+    if len(applications) > 0:
+        return '[{}]'.format(','.join(applications))
+    else:
+        return '[{"app_id": "null"}]'
+
+
 class JobsApiClient(ApiClient):
     path = '/jobs/'
 
-    def list(self, nb=DEFAULT_PAGE_SIZE, page=1, sort='-_updated'):
-        return self._do_list(self.path, nb, page, sort, embedded='{"app_id":1}')
+    def list(self, nb=DEFAULT_PAGE_SIZE, page=1, sort='-_updated',
+             application=None, env=None, role=None, command=None, status=None, user=None):
+        query = {}
+
+        if application or env or role:
+            apps_api = AppsApiClient(self.host, self.username, self.password)
+            query['$or'] = get_applist_join_query(apps_api, application, role, env)
+
+        if command:
+            query['command'] = '"{}"'.format(command)
+
+        if status:
+            query['status'] = '"{}"'.format(status)
+
+        if user:
+            query['user'] = '"{}"'.format(user)
+
+        querystr = '{' + ','.join('"{key}":{value}'.format(key=key, value=value) for key, value in query.items()) + '}'
+        return self._do_list(self.path, nb, page, sort, embedded='{"app_id":1}', where=querystr)
 
     def command_buildimage(self, application_id, instance_type=None, skip_bootstrap=None):
         """
@@ -427,5 +497,19 @@ class JobsApiClient(ApiClient):
 class DeploymentsApiClient(ApiClient):
     path = '/deployments/'
 
-    def list(self, nb=DEFAULT_PAGE_SIZE, page=1, sort='-timestamp'):
-        return self._do_list(self.path, nb, page, sort, embedded='{"app_id":1,"job_id":1}')
+    def list(self, nb=DEFAULT_PAGE_SIZE, page=1, sort='-timestamp',
+             application=None, env=None, role=None, revision=None, module=None):
+        query = {}
+
+        if application or env or role:
+            apps_api = AppsApiClient(self.host, self.username, self.password)
+            query['$or'] = get_applist_join_query(apps_api, application, role, env)
+
+        if revision:
+            query['revision'] = '"{}"'.format(revision)
+
+        if module:
+            query['module'] = '{{"$regex":".*{m}.*"}}'.format(m=module)
+
+        querystr = '{' + ','.join('"{key}":{value}'.format(key=key, value=value) for key, value in query.items()) + '}'
+        return self._do_list(self.path, nb, page, sort, embedded='{"app_id":1,"job_id":1}', where=querystr)
