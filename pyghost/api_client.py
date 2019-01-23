@@ -567,8 +567,7 @@ class JobsApiClient(ApiClient):
         """
         if not self._check_websocket():
             raise socketio_exceptions.ConnectionError('Websocket server is unavailable.')
-
-        with SocketIO(api_endpoint, verify=False) as socketIO:
+        with SocketIO(api_endpoint, verify=True) as socketIO:
             logdata = {
                 'log_id': job_id,
                 'last_pos': 0,
