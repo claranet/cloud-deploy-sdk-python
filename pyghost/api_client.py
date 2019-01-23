@@ -1,11 +1,11 @@
 import copy
 import json
-import requests
-
 import urllib.parse
 from base64 import b64encode
 from enum import Enum
 
+import requests
+from socketIO_client import SocketIO, exceptions as socketio_exceptions
 
 DEFAULT_HEADERS = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
@@ -524,13 +524,34 @@ class JobsApiClient(ApiClient):
         data = self._do_request(path, params={}, return_type=RETURN_TYPE_PLAIN)
         return data
 
-    def check_websocket(self):
+    def _check_websocket(self):
         """
         Return websocket status
         :return: bool: status of the websocket service
         """
         check_ws = requests.get('{}/socket.io/'.format(self.host))
         return check_ws.status_code == 200
+
+    def wait_for_job_status(self, api_endpoint, job, job_id, job_handler, job_status_to_wait):
+        """
+        Wait for the job to have its state changed.
+        :param api_endpoint: str: Endpoint URL
+        :param job: object: Job element retrieved via API
+        :param job_id: str: Job UID
+        :param job_handler: function: Data handler
+        :param job_status_to_wait: enum:
+        :return:
+        """
+        if not self._check_websocket():
+            raise socketio_exceptions.ConnectionError('Websocket server is unavailable.')
+
+        with SocketIO(api_endpoint, verify=False) as socketIO:
+            socketIO.emit('job_logging', {'log_id': job_id, 'last_pos': 0, 'raw_mode': True})
+            socketIO.on('job', job_handler)
+            while job['status'] == job_status_to_wait:
+                socketIO.wait(seconds=3)
+                job = self.retrieve(job_id)
+            return job
 
 
 class DeploymentsApiClient(ApiClient):
