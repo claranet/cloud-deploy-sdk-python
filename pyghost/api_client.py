@@ -569,7 +569,13 @@ class JobsApiClient(ApiClient):
             raise socketio_exceptions.ConnectionError('Websocket server is unavailable.')
 
         with SocketIO(api_endpoint, verify=False) as socketIO:
-            socketIO.emit('job_logging', {'log_id': job_id, 'last_pos': 0, 'raw_mode': True})
+            logdata = {
+                'log_id': job_id,
+                'last_pos': 0,
+                'raw_mode': True,
+                'auth_token': self.get_websocket_token(job_id)
+            }
+            socketIO.emit('job_logging', logdata)
             socketIO.on('job', job_handler)
             while job['status'] == job_status_to_wait:
                 socketIO.wait(seconds=3)
