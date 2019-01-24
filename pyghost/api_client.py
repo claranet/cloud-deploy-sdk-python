@@ -1,6 +1,7 @@
 import base64
 import copy
 import json
+import os
 import re
 import time
 import urllib.parse
@@ -131,7 +132,7 @@ class ApiClient(object):
         return base_url
 
     def _do_request(self, path, object_id=None, body=None, params=None,
-                    method=METHOD_GET, return_type=RETURN_TYPE_JSON, headers={}):
+                    method=METHOD_GET, return_type=RETURN_TYPE_JSON, headers=None):
         """
         Do the API requests
         :param path: str:
@@ -143,12 +144,14 @@ class ApiClient(object):
         :param headers: dict:
         :return: dict:
         """
+        if headers is None:
+            headers = {}
         url = self._get_url(path, params, object_id)
         try:
             response = requests.request(method, url,
                                         json=body,
                                         auth=(self.username, self.password),
-                                        headers={**DEFAULT_HEADERS,**headers})
+                                        headers={**DEFAULT_HEADERS, **headers})
             if response.status_code >= 300:
                 raise ApiClientException(
                     'Error while calling Cloud Deploy : [{}] {}'.format(response.status_code, response.text))
@@ -200,16 +203,24 @@ class ApiClient(object):
         data = self._do_request(path, body=obj, params=extra_params, method=METHOD_POST)
         return data.get('_id')
 
-    def _do_update(self, path, obj, headers, **extra_params):
+    def _do_update(self, path, obj, etag, headers=None, **extra_params):
         """
         Do the update API call
         :param path: str:
         :param obj: dict:
+        :param etag: string ID:
         :param headers: dict:
         :param extra_params: dict:
         :return: str:
         """
-        data = self._do_request(path, body=obj, params=extra_params, method=METHOD_PATCH, headers=headers)
+        obj_id = obj.get('_id', None)
+        if obj_id is None:
+            raise ValueError("'_id' attribute must be set on your object.")
+        if headers is None:
+            headers = {}
+        headers['If-Match'] = etag
+        data = self._do_request(os.path.join(path, obj_id), body=obj, params=extra_params,
+                                method=METHOD_PATCH, headers=headers)
         return data.get('_id')
 
     def retrieve(self, object_id):
@@ -301,7 +312,7 @@ class AppsApiClient(ApiClient):
         """
         if not self.path:
             raise NotImplementedError('`path` variable must be defined')
-        return self._do_update(self.path + obj['_id'], obj, {'If-Match': etag})
+        return self._do_update(self.path, obj, etag)
 
     def validate_schema(self, app, check_id=False):
         """
