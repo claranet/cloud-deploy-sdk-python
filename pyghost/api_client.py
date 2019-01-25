@@ -9,10 +9,9 @@ from base64 import b64encode
 from enum import Enum
 
 import requests
-from schema import And, Regex, Schema
 from socketIO_client import SocketIO
 
-from .app_schema import APPLICATION_SCHEMA
+from .app_schema import APPLICATION_SCHEMA, APPLICATION_ID_SCHEMA
 
 DEFAULT_HEADERS = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
@@ -324,10 +323,9 @@ class AppsApiClient(ApiClient):
         if check_id:
             check_id = app['_id']
             del app['_id']
-        schema = APPLICATION_SCHEMA
-        schema.validate(app)
+        APPLICATION_SCHEMA.validate(app)
         if check_id:
-            Schema(And(str, Regex(r'[a-f0-9]{24}'))).validate(check_id)
+            APPLICATION_ID_SCHEMA.validate(check_id)
         return check_id or app.get('_id')
 
 

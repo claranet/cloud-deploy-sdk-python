@@ -1,6 +1,8 @@
 from schema import And, Optional, Regex, Schema
 
 
+APPLICATION_ID_SCHEMA = Schema(And(str, Regex(r'[a-f0-9]{24}')))
+
 APPLICATION_SCHEMA = Schema({
     'name': And(str, Regex(r'^[a-zA-Z0-9_.+-]*$')),
     'env': And(str, Regex(r'^[a-z0-9\-\_]*$')),
