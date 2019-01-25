@@ -299,7 +299,7 @@ class AppsApiClient(ApiClient):
         :return: str: id of the created object
         """
         if not self.path:
-            raise NotImplementedError('`path` variable must be defined')
+            raise ValueError('`path` variable must be defined')
         return self._do_create(self.path, obj)
 
     def update(self, obj, etag):
@@ -310,7 +310,7 @@ class AppsApiClient(ApiClient):
         :return: str: id of the updated object
         """
         if not self.path:
-            raise NotImplementedError('`path` variable must be defined')
+            raise ValueError('`path` variable must be defined')
         return self._do_update(self.path, obj, etag)
 
     def validate_schema(self, app, check_id=False):
