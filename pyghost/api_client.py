@@ -232,6 +232,7 @@ class ApiClient(object):
     def version(self):
         """
         Return Cloud-Deploy running version
+        :return: str: API version or git branch/tag
         """
         try:
             return self._do_request('/version')
@@ -562,7 +563,7 @@ class JobsApiClient(ApiClient):
         :param job_id: str: Job UID
         :param job_handler: function: Data handler
         :param job_status_to_wait: enum:
-        :return:
+        :return: job: latest updated job object
         """
         if not self._check_websocket():
             raise socketio_exceptions.ConnectionError('Websocket server is unavailable.')
