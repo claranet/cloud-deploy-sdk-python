@@ -1,3 +1,5 @@
+import base64
+import re
 import copy
 import json
 import urllib.parse
@@ -537,6 +539,20 @@ class JobsApiClient(ApiClient):
         """
         check_ws = requests.get('{}/socket.io/'.format(self.host))
         return check_ws.status_code == 200
+
+    def handle_job_data(self, args):
+        """
+        Handle Job data and returns a string
+        :param args: Socket/API Job data arguments
+        :return: Job data as string
+        """
+        if 'raw' not in args:
+            # Backward compatibility, old API returns HTML data for WebUI
+            data_str = re.sub('<[^<]+?>', '', args['html'].replace('</div><div class="panel panel-default">', "\n"))
+            data_str = data_str + "\n"
+        else:
+            data_str = base64.b64decode(args['raw'])
+        return data_str
 
     def wait_for_job_status(self, api_endpoint, job, job_id, job_handler, job_status_to_wait):
         """
