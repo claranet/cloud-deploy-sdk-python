@@ -5,7 +5,10 @@ from base64 import b64encode
 from enum import Enum
 
 import requests
+from pkg_resources import parse_version as parsev
 from socketIO_client import SocketIO, exceptions as socketio_exceptions
+
+from .utils import is_dev_version
 
 DEFAULT_HEADERS = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
@@ -514,12 +517,15 @@ class JobsApiClient(ApiClient):
         }
         return self.create(job)
 
-    def get_logs(self, job_id):
+    def get_logs(self, job_id, api_version):
         """
         Return a job log
         :param job_id: str: Job ID
+        :param api_version: str: version format
         :return: str: data of the job
         """
+        if not is_dev_version(api_version) and parsev(api_version) < parsev('18.05.1'):
+            raise Exception('Your Cloud-Deploy API is not up-to-date, please update (v18.05.1+  required).')
         path = '/jobs/{}/logs/'.format(job_id)
         data = self._do_request(path, params={}, return_type=RETURN_TYPE_PLAIN)
         return data
