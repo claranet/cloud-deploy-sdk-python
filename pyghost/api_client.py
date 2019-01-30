@@ -567,14 +567,33 @@ class JobsApiClient(ApiClient):
         """
         if not self._check_websocket():
             raise socketio_exceptions.ConnectionError('Websocket server is unavailable.')
-
-        with SocketIO(api_endpoint, verify=False) as socketIO:
-            socketIO.emit('job_logging', {'log_id': job_id, 'last_pos': 0, 'raw_mode': True})
+        with SocketIO(api_endpoint, verify=True) as socketIO:
+            logdata = {
+                'log_id': job_id,
+                'last_pos': 0,
+                'raw_mode': True,
+                'auth_token': self.get_websocket_token(job_id)
+            }
+            socketIO.emit('job_logging', logdata)
             socketIO.on('job', job_handler)
             while job['status'] == job_status_to_wait:
                 socketIO.wait(seconds=3)
                 job = self.retrieve(job_id)
             return job
+
+
+    def get_websocket_token(self, job_id):
+        """
+        Return a job websocket token
+        :param job_id: str: Job ID
+        :return: str: websocket token of the job
+        """
+        path = '/jobs/{}/websocket_token/'.format(job_id)
+        try:
+            token = self._do_request(path, params={}).get('token', '')
+        except:
+            token = False
+        return token
 
 
 class DeploymentsApiClient(ApiClient):
