@@ -8,10 +8,8 @@ from base64 import b64encode
 from enum import Enum
 
 import requests
-from pkg_resources import parse_version as parsev
 from socketIO_client import SocketIO
 
-from .utils import is_dev_version
 
 DEFAULT_HEADERS = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
@@ -90,7 +88,6 @@ class ApiClientException(Exception):
 
 class ApiClient(object):
     path = None
-    _version = None
 
     def __init__(self, host, username, password):
         """
@@ -231,16 +228,13 @@ class ApiClient(object):
             raise NotImplementedError('`path` variable must be defined')
         return self._do_create(self.path, obj)
 
-    @property
-    def version(self):
+    def get_version(self):
         """
         Return Cloud Deploy running version
-        :return: str: API version or git branch/tag
+        :return: dict: API version or git branch/tag
         """
         try:
-            if not self._version:
-                self._version = self._do_request('/version')
-            return self._version
+            return self._do_request('/version')
         except:
             return {
                 'current_revision_date': '',
@@ -541,7 +535,7 @@ class JobsApiClient(ApiClient):
 
         if job['status'] == JobStatuses.INIT.value:
             exception_handler(ApiClientException('The job is not started.'))
-        elif job['status'] == JobStatuses.STARTED.value:
+        else:
             check_ws = requests.get(urllib.parse.urljoin(self.host, '/socket.io/'))
             if not check_ws.status_code == 200:
                 exception_handler(ApiClientException('Websocket server is unavailable.'))
@@ -578,13 +572,6 @@ class JobsApiClient(ApiClient):
                     socketIO.wait(seconds=3)
                     job = self.retrieve(job_id)
                 socketIO.wait(seconds=3)    # We wait 3 more seconds to be sure to get all the data
-        else:
-            version = self.version['current_revision_name']
-            if not is_dev_version(version) and parsev(version) < parsev('18.05.1'):
-                exception_handler(ApiClientException('This feature requires Cloud Deploy v18.05.1+.'))
-            path = '/jobs/{}/logs/'.format(job_id)
-            data = self._do_request(path, return_type=RETURN_TYPE_PLAIN)
-            success_handler(data)
 
     def _get_websocket_token(self, job_id):
         """
