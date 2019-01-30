@@ -2,13 +2,14 @@ import base64
 import re
 import copy
 import json
+import time
 import urllib.parse
 from base64 import b64encode
 from enum import Enum
 
 import requests
 from pkg_resources import parse_version as parsev
-from socketIO_client import SocketIO, exceptions as socketio_exceptions
+from socketIO_client import SocketIO
 
 from .utils import is_dev_version
 
@@ -89,6 +90,7 @@ class ApiClientException(Exception):
 
 class ApiClient(object):
     path = None
+    _version = None
 
     def __init__(self, host, username, password):
         """
@@ -229,13 +231,16 @@ class ApiClient(object):
             raise NotImplementedError('`path` variable must be defined')
         return self._do_create(self.path, obj)
 
+    @property
     def version(self):
         """
-        Return Cloud-Deploy running version
+        Return Cloud Deploy running version
         :return: str: API version or git branch/tag
         """
         try:
-            return self._do_request('/version')
+            if not self._version:
+                self._version = self._do_request('/version')
+            return self._version
         except:
             return {
                 'current_revision_date': '',
@@ -520,69 +525,68 @@ class JobsApiClient(ApiClient):
         }
         return self.create(job)
 
-    def get_logs(self, job_id, api_version):
+    def get_logs_async(self, job_id, success_handler, exception_handler, wait_for_start=False):
         """
-        Return a job log
+        Return job logs through callback functions
         :param job_id: str: Job ID
-        :param api_version: str: version format
+        :param success_handler: function: Success function callback, arguments: log_message
+        :param exception_handler: function: Error function callback, arguments: exception
+        :param wait_for_start: bool: true if we should wait for the job to start
         :return: str: data of the job
         """
-        if not is_dev_version(api_version) and parsev(api_version) < parsev('18.05.1'):
-            raise Exception('Your Cloud-Deploy API is not up-to-date, please update (v18.05.1+  required).')
-        path = '/jobs/{}/logs/'.format(job_id)
-        data = self._do_request(path, params={}, return_type=RETURN_TYPE_PLAIN)
-        return data
+        job = self.retrieve(job_id)
+        while wait_for_start and job['status'] == JobStatuses.INIT.value:
+            time.sleep(3)
+            job = self.retrieve(job_id)
 
-    def _check_websocket(self):
-        """
-        Return websocket status
-        :return: bool: status of the websocket service
-        """
-        check_ws = requests.get('{}/socket.io/'.format(self.host))
-        return check_ws.status_code == 200
+        if job['status'] == JobStatuses.INIT.value:
+            exception_handler(ApiClientException('The job is not started.'))
+        elif job['status'] == JobStatuses.STARTED.value:
+            check_ws = requests.get(urllib.parse.urljoin(self.host, '/socket.io/'))
+            if not check_ws.status_code == 200:
+                exception_handler(ApiClientException('Websocket server is unavailable.'))
+                return
 
-    def handle_job_data(self, args):
-        """
-        Handle Job data and returns a string
-        :param args: Socket/API Job data arguments
-        :return: Job data as string
-        """
-        if 'raw' not in args:
-            # Backward compatibility, old API returns HTML data for WebUI
-            data_str = re.sub('<[^<]+?>', '', args['html'].replace('</div><div class="panel panel-default">', "\n"))
-            data_str = data_str + "\n"
+            socket_host = self.host if self.host[-1] != '/' else self.host[0:-1]
+            with SocketIO(socket_host, verify=True) as socketIO:
+                def callback(args):
+                    try:
+                        if 'error' in args:
+                            exception_handler(ApiClientException(args['error']))
+                            return
+                        if 'raw' not in args:
+                            # Backward compatibility, old API returns HTML data for WebUI
+                            data_str = re.sub('<[^<]+?>', '',
+                                              args['html'].replace('</div><div class="panel panel-default">', "\n"))
+                            data_str = data_str + "\n"
+                        else:
+                            data_str = base64.b64decode(args['raw'])
+                        success_handler(data_str)
+                    except Exception as e:
+                        exception_handler(e)
+
+                params = {
+                    'log_id': job_id,
+                    'last_pos': 0,
+                    'raw_mode': True,
+                    'auth_token': self._get_websocket_token(job_id)
+                }
+                socketIO.emit('job_logging', params)
+                socketIO.on('job', callback)
+
+                while job['status'] == JobStatuses.STARTED.value:
+                    socketIO.wait(seconds=3)
+                    job = self.retrieve(job_id)
+                socketIO.wait(seconds=3)    # We wait 3 more seconds to be sure to get all the data
         else:
-            data_str = base64.b64decode(args['raw'])
-        return data_str
+            version = self.version['current_revision_name']
+            if not is_dev_version(version) and parsev(version) < parsev('18.05.1'):
+                exception_handler(ApiClientException('This feature requires Cloud Deploy v18.05.1+.'))
+            path = '/jobs/{}/logs/'.format(job_id)
+            data = self._do_request(path, return_type=RETURN_TYPE_PLAIN)
+            success_handler(data)
 
-    def wait_for_job_status(self, api_endpoint, job, job_id, job_handler, job_status_to_wait):
-        """
-        Wait for the job to have its state changed.
-        :param api_endpoint: str: Endpoint URL
-        :param job: object: Job element retrieved via API
-        :param job_id: str: Job UID
-        :param job_handler: function: Data handler
-        :param job_status_to_wait: enum:
-        :return: job: latest updated job object
-        """
-        if not self._check_websocket():
-            raise socketio_exceptions.ConnectionError('Websocket server is unavailable.')
-        with SocketIO(api_endpoint, verify=True) as socketIO:
-            logdata = {
-                'log_id': job_id,
-                'last_pos': 0,
-                'raw_mode': True,
-                'auth_token': self.get_websocket_token(job_id)
-            }
-            socketIO.emit('job_logging', logdata)
-            socketIO.on('job', job_handler)
-            while job['status'] == job_status_to_wait:
-                socketIO.wait(seconds=3)
-                job = self.retrieve(job_id)
-            return job
-
-
-    def get_websocket_token(self, job_id):
+    def _get_websocket_token(self, job_id):
         """
         Return a job websocket token
         :param job_id: str: Job ID
