@@ -556,6 +556,8 @@ class JobsApiClient(ApiClient):
                         else:
                             data_str = base64.b64decode(args['raw'])
                         if no_color:
+                            # Remove ANSI escape sequences
+                            # https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
                             data_str = re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', data_str)
                         success_handler(data_str)
                     except Exception as e:
