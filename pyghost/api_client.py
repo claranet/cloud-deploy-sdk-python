@@ -519,7 +519,7 @@ class JobsApiClient(ApiClient):
         }
         return self.create(job)
 
-    def get_logs_async(self, job_id, success_handler, exception_handler, wait_for_start=False):
+    def get_logs_async(self, job_id, success_handler, exception_handler, wait_for_start=False, no_color=False):
         """
         Return job logs through callback functions
         :param job_id: str: Job ID
@@ -555,6 +555,10 @@ class JobsApiClient(ApiClient):
                             data_str = data_str + "\n"
                         else:
                             data_str = base64.b64decode(args['raw'])
+                        if no_color:
+                            # Remove ANSI escape sequences
+                            # https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
+                            data_str = re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', data_str)
                         success_handler(data_str)
                     except Exception as e:
                         exception_handler(e)
