@@ -1,11 +1,15 @@
-import urllib.parse
-
+import base64
+import re
 import copy
 import json
+import time
+import urllib.parse
 from base64 import b64encode
 from enum import Enum
 
 import requests
+from socketIO_client import SocketIO
+
 
 DEFAULT_HEADERS = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
@@ -13,6 +17,9 @@ DEFAULT_PAGE_SIZE = 20
 
 METHOD_GET = 'get'
 METHOD_POST = 'post'
+
+RETURN_TYPE_PLAIN = 'plain'
+RETURN_TYPE_JSON = 'json'
 
 DEPLOYMENT_STRATEGY_SERIAL = 'serial'
 DEPLOYMENT_STRATEGY_PARALLEL = 'parallel'
@@ -120,7 +127,8 @@ class ApiClient(object):
             return "{}?{}".format(base_url, urllib.parse.urlencode(params, safe=':'))
         return base_url
 
-    def _do_request(self, path, object_id=None, body=None, params=None, method=METHOD_GET):
+    def _do_request(self, path, object_id=None, body=None, params=None,
+                    method=METHOD_GET, return_type=RETURN_TYPE_JSON):
         """
         Do the API requests
         :param path: str:
@@ -128,6 +136,7 @@ class ApiClient(object):
         :param body: dict:
         :param params: dict:
         :param method: str:
+        :param return_type: str:
         :return: dict:
         """
         url = self._get_url(path, params, object_id)
@@ -139,7 +148,10 @@ class ApiClient(object):
             if response.status_code >= 300:
                 raise ApiClientException(
                     'Error while calling Cloud Deploy : [{}] {}'.format(response.status_code, response.text))
-            ret = response.json()
+            if return_type == RETURN_TYPE_JSON:
+                ret = response.json()
+            else:
+                ret = response.text
         except requests.ConnectionError as e:
             raise ApiClientException('Error while sending request to {}'.format(url)) from e
         except ValueError as e:
@@ -215,6 +227,20 @@ class ApiClient(object):
         if not self.path:
             raise NotImplementedError('`path` variable must be defined')
         return self._do_create(self.path, obj)
+
+    def get_version(self):
+        """
+        Return Cloud Deploy running version
+        :return: dict: API version or git branch/tag
+        """
+        try:
+            return self._do_request('/version')
+        except:
+            return {
+                'current_revision_date': '',
+                'current_revision_name': 'unknown',
+                'current_revision': 'unknown'
+            }
 
 
 class AppsApiClient(ApiClient):
@@ -492,6 +518,73 @@ class JobsApiClient(ApiClient):
             "options": [strategy],
         }
         return self.create(job)
+
+    def get_logs_async(self, job_id, success_handler, exception_handler, wait_for_start=False):
+        """
+        Return job logs through callback functions
+        :param job_id: str: Job ID
+        :param success_handler: function: Success function callback, arguments: log_message
+        :param exception_handler: function: Error function callback, arguments: exception
+        :param wait_for_start: bool: true if we should wait for the job to start
+        :return: str: data of the job
+        """
+        job = self.retrieve(job_id)
+        while wait_for_start and job['status'] == JobStatuses.INIT.value:
+            time.sleep(3)
+            job = self.retrieve(job_id)
+
+        if job['status'] == JobStatuses.INIT.value:
+            exception_handler(ApiClientException('The job is not started.'))
+        else:
+            check_ws = requests.get(urllib.parse.urljoin(self.host, '/socket.io/'))
+            if not check_ws.status_code == 200:
+                exception_handler(ApiClientException('Websocket server is unavailable.'))
+                return
+
+            socket_host = self.host if self.host[-1] != '/' else self.host[0:-1]
+            with SocketIO(socket_host, verify=True) as socketIO:
+                def callback(args):
+                    try:
+                        if 'error' in args:
+                            exception_handler(ApiClientException(args['error']))
+                            return
+                        if 'raw' not in args:
+                            # Backward compatibility, old API returns HTML data for WebUI
+                            data_str = re.sub('<[^<]+?>', '',
+                                              args['html'].replace('</div><div class="panel panel-default">', "\n"))
+                            data_str = data_str + "\n"
+                        else:
+                            data_str = base64.b64decode(args['raw'])
+                        success_handler(data_str)
+                    except Exception as e:
+                        exception_handler(e)
+
+                params = {
+                    'log_id': job_id,
+                    'last_pos': 0,
+                    'raw_mode': True,
+                    'auth_token': self._get_websocket_token(job_id)
+                }
+                socketIO.emit('job_logging', params)
+                socketIO.on('job', callback)
+
+                while job['status'] == JobStatuses.STARTED.value:
+                    socketIO.wait(seconds=3)
+                    job = self.retrieve(job_id)
+                socketIO.wait(seconds=3)    # We wait 3 more seconds to be sure to get all the data
+
+    def _get_websocket_token(self, job_id):
+        """
+        Return a job websocket token
+        :param job_id: str: Job ID
+        :return: str: websocket token of the job
+        """
+        path = '/jobs/{}/websocket_token/'.format(job_id)
+        try:
+            token = self._do_request(path, params={}).get('token', '')
+        except:
+            token = False
+        return token
 
 
 class DeploymentsApiClient(ApiClient):
