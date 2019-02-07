@@ -105,7 +105,12 @@ APPLICATION_SCHEMA = Schema({
 
     'modules': [{
         'name': And(str, Regex(r'^[a-zA-Z0-9\.\-\_]*$')),
-        'git_repo': str,
+        Optional('git_repo'): str,
+        Optional('source'): {
+            Optional('protocol', default='git'): And(str, lambda s: s in ['git', 's3']),
+            Optional('url'): str,
+            Optional('mode', default='symlink'): And(str, lambda s: s in ['symlink']),
+        },
         'path': And(str, Regex(r'^(/[a-zA-Z0-9\.\-\_]+)+$')),
         'scope': And(str, lambda s: s in ['system', 'code']),
         Optional('uid', default=0): And(int, lambda n: n >= 0),
