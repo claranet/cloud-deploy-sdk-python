@@ -71,7 +71,10 @@ APPLICATION_SCHEMA = Schema({
         'var_value': str
     }],
 
-    Optional('log_notifications'): [And(str, Regex(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'))],
+    Optional('log_notifications'): [{
+        'email': And(str, Regex(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')),
+        'job_states': [And(str, lambda s: s in ['*', 'done', 'failed', 'aborted'])],
+    }],
 
     Optional('blue_green'): {
         Optional('enable_blue_green'): bool,
