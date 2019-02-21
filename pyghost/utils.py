@@ -46,4 +46,4 @@ def trim_ansi_tags(data_str):
     """
     # Remove ANSI escape sequences
     # https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
-    return re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', data_str)
+    return re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', data_str.decode('utf-8'))

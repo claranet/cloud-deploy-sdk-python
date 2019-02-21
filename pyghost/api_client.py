@@ -588,6 +588,7 @@ class JobsApiClient(ApiClient):
         :param success_handler: function: Success function callback, arguments: log_message
         :param exception_handler: function: Error function callback, arguments: exception
         :param wait_for_start: bool: true if we should wait for the job to start
+        :param no_color: bool: false by default, should ASCII chars be stripped
         :return: str: data of the job
         """
         job = self.retrieve(job_id)
