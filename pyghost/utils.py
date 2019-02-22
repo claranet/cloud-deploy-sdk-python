@@ -43,7 +43,13 @@ def trim_ansi_tags(data_str):
     '2019/02/11 09:34:37 GMT: STATE: Started'
     >>> trim_ansi_tags('2019/02/11 09:34:37 GMT: \x1B[32mSTATE: Started\x1B[0m'.encode('utf-8'))
     '2019/02/11 09:34:37 GMT: STATE: Started'
+    >>> trim_ansi_tags(b'2019/02/11 09:34:37 GMT: \x1B[33mBlue/green swap aborted for [ghost-testing/test/webfront] : Blue/green is not enabled on this app or not well configured\x1B[0m')
+    '2019/02/11 09:34:37 GMT: Blue/green swap aborted for [ghost-testing/test/webfront] : Blue/green is not enabled on this app or not well configured'
     """
     # Remove ANSI escape sequences
     # https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
-    return re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', data_str.decode('utf-8'))
+    try:
+        data_str = data_str.decode('utf-8')
+    except AttributeError:
+        pass
+    return re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', data_str)
