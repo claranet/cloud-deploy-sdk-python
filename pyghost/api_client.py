@@ -2,7 +2,6 @@ import base64
 import copy
 import json
 import os
-import re
 import time
 import urllib.parse
 from base64 import b64encode
@@ -12,6 +11,7 @@ import requests
 from socketIO_client import SocketIO
 
 from .app_schema import APPLICATION_SCHEMA, APPLICATION_ID_SCHEMA
+from .utils import trim_xml_html_tags, trim_ansi_tags
 
 DEFAULT_HEADERS = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
@@ -612,15 +612,12 @@ class JobsApiClient(ApiClient):
                             return
                         if 'raw' not in args:
                             # Backward compatibility, old API returns HTML data for WebUI
-                            data_str = re.sub('<[^<]+?>', '',
-                                              args['html'].replace('</div><div class="panel panel-default">', "\n"))
+                            data_str = trim_xml_html_tags(args['html'])
                             data_str = data_str + "\n"
                         else:
                             data_str = base64.b64decode(args['raw'])
                         if no_color:
-                            # Remove ANSI escape sequences
-                            # https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
-                            data_str = re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', data_str)
+                            data_str = trim_ansi_tags(data_str)
                         success_handler(data_str)
                     except Exception as e:
                         exception_handler(e)
