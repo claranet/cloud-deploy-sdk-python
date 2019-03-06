@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.2.1
+ - GHOST-706/707: Fix job log command with `--no-color` flag may fail
+ - GHOST-710: Add CI and some unit tests
+
 ## v0.2
  - GHOST-603: Implement deployments and jobs filtering
  - GHOST-523: See and download job logs
