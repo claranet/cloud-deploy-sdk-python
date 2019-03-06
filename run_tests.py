@@ -10,6 +10,7 @@ import importlib
 modules = [
     "pyghost.api_client",
     "pyghost.app_schema",
+    "pyghost.utils",
 ]
 
 runner = doctest.DocTestRunner(verbose=True)
