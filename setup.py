@@ -6,8 +6,8 @@ from codecs import open
 from setuptools import setup, find_packages
 import os
 
-requirements = parse_requirements('requirements.txt', session='hack')
 here = os.path.abspath(os.path.dirname(__file__))
+requirements = parse_requirements(os.path.join(here, 'requirements.txt'), session='hack')
 
 about = {}
 with open(os.path.join(here, 'pyghost', '__version__.py'), 'r', 'utf-8') as f:

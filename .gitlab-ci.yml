@@ -1,0 +1,11 @@
+image: quay.io/python-devs/ci-image
+
+stages:
+  - unit-tests
+
+tests:
+  stage: unit-tests
+  tags:
+    - default
+  script:
+    - tox -e py35,py36,py37,py38
